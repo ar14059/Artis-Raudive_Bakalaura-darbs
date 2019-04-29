@@ -1,0 +1,456 @@
+---
+jupyter:
+  jupytext:
+    jupytext_formats: ipynb,Rmd:rmarkdown
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.1'
+      jupytext_version: 1.1.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
+```{python}
+# Atslēdz auto-save iespēju
+# %autosave 0
+```
+
+```{python}
+# # # Importētie moduļi
+
+# # "Grafiskie" moduļi
+import rdfpandas.graph  # tika importeets Anaconda sisteemaa
+import pandas as pd  # tika importeets Anaconda sisteemaa
+from ipywidgets import widgets   # pievienots GUI (button, textbox u.tml.) + event handler
+from IPython.display import clear_output # dod iespēju izdzēst sūnas "Out" saturu, izmantojot komandu
+
+# # Pamata modulis darbam ar semantiskiem datiem
+import rdflib # tika importēts Anaconda sistēmā
+
+# # moduļi strukturētu (ne obligāti RDF) datu iegūšānai 
+from urllib.request import urlopen, Request
+import json
+
+# # modulis SPARQL valodas pielietošanai saistīto datu iegūšanai 
+from SPARQLWrapper import SPARQLWrapper, JSON 
+
+# # Papildus moduļi datu apstrādei / analīzei
+import datetime # var pārbaudīt, vai objekts ir datums
+
+
+qwerty = "qwerty"
+qwerty
+
+```
+
+```{python}
+# # # Sistēmas funkcijas un galvenie mainīgie (galvenokārt, vārdnīcas vai saraksti)
+
+def rand_node(count):
+    import random
+    import string
+    node = ""
+    char_set = string.ascii_letters + "0123456789"
+    for i in range(count):
+        node += random.choice(char_set)
+    return node
+
+
+def val_type(v):
+    return type(v).__name__
+
+
+# # # SPARQL izsaukumi
+
+sparql_lang_wrapper = "https://databus.dbpedia.org/repo/sparql"
+sparql_lang_query = """
+    PREFIX dataid: <http://dataid.dbpedia.org/ns/core#>
+    PREFIX dct:    <http://purl.org/dc/terms/>
+    PREFIX dcat:   <http://www.w3.org/ns/dcat#>
+    PREFIX db:     <https://databus.dbpedia.org/>
+    PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    PREFIX rdfs:   <http://www.w3.org/2000/01/rdf-schema#>
+
+    SELECT DISTINCT ?l WHERE {
+      ?s a dataid:Dataset ; dataid:artifact <https://databus.dbpedia.org/dbpedia/generic/labels> ; dcat:distribution ?d. 
+      ?d <http://dataid.dbpedia.org/ns/cv#lang> ?l.
+    } 
+    LIMIT 1000
+"""
+def sparqlResult(wrapper, query):    
+    arr = []
+
+    sparql = SPARQLWrapper(wrapper)
+    sparql.setQuery(query)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
+    results
+    for result in results["results"]["bindings"]:
+        arr.append(result["l"]["value"])
+    return arr
+
+# print(sparqlResult(sparql_lang_wrapper, sparql_lang_query))
+
+
+
+# representsType(s) - funkcija, kas pārbauda "Literal" vērtību, pārbauda, 
+# kāds varētu būt tā datutips un izvada tā nosaukumu, balstoties uz 
+# XMLSchema datutipiem (pagaidām tikai trīs tipi, 
+# kas tika atrasti JSON struktūrā)
+
+
+
+lang_arr = sparqlResult(sparql_lang_wrapper, sparql_lang_query)
+def representsType(s):
+    # OWL(varbūt) vārdnīcas
+    
+    uri_prefix_arr = ["http://","https://","uri:","_:"]
+    try:
+        datetime.datetime.strptime(s[0:10], "%Y-%m-%d")
+        return "date"
+    except:
+        try:
+            if(val_type(s) == "str"):
+                if(("." in s) and (float(s))):
+                    return "decimal"
+                else:
+                    raise ValueError()
+            else:
+                if (isinstance(s, float)):
+                    return "decimal"
+                else:
+                    raise ValueError()      
+        except:
+            try:
+                int(s)
+                return "nonNegativeInteger"
+            except:
+                try:
+                    for pref in uri_prefix_arr:
+                        if(s.startswith(pref)):
+                            return "uri"
+                    else:
+                        raise ValueError()
+                except:
+                    try:
+                        if(s in lang_arr):
+                            return "lang"
+                        else:
+                            raise ValueError()
+                    except: 
+                        try:
+                            for lang in lang_arr:
+                                if(s.startswith(lang+"_")):
+                                    return "lang_ext"
+                            else:
+                                raise ValueError()
+                        except: 
+                            return "langString"
+
+
+
+
+specific_ns = {"dbr" : rdflib.term.URIRef("http://dbpedia.org/resource/")}
+
+# graph_to_prefix_table__DataFrame(rdf_graph) - funkcija, kas 
+# saīsina URI, izmantojot PREFIX vērtības un pārveido datus, 
+# lai tie tiktu smukāk attēloti "DataFrame" tabulā
+def graph_to_prefix_table__DataFrame(rdf_graph):
+    subject_array = []
+    predicate_array = []
+    object_array = []
+    dict = {}
+
+    # Pievieno prefiksus no:
+    # DBPedia turtle formāta faila;
+    for ns in rdf_graph.namespaces():
+        dict[ns[0]] = ns[1]
+    # speciālo prefiksu vārdnīcas
+    for key,val in specific_ns.items():
+        dict[key] = val
+
+    # saīsina URI, izmantojot PREFIX vērtības
+    for subj, pred, obj in rdf_graph:
+        for key,val in dict.items(): 
+            if (subj.startswith(val)):
+                subj = subj.replace(val, key + ":")           
+            if (pred.startswith(val)):
+                pred = pred.replace(val, key + ":")   
+            if (obj.startswith(val)):
+                obj = subj.replace(val, key + ":")  
+
+        subject_array.append( subj )
+        predicate_array.append( pred )
+        object_array.append( obj )
+
+    # rindu (ierakstu) skaits tabulā      `
+    pd.set_option('display.max_rows', len(subject_array)) 
+    # kolonnas max iespējamais ievadāmo simb skaits
+    pd.options.display.max_colwidth = max_width  
+    
+    return {'Subject': subject_array, 'Predicate': predicate_array, 'Object': object_array}
+
+```
+
+```{python}
+# # # Kitsu API izveidotās funkcijas:
+
+# jsonDataNoAttr(json_data) - funkcija, kas izņem no JSON 
+# tipa datiem atribūtus, kas ir/būs saistīti ar DBPedia JSON-LD 
+# atribūtiem un ievieto šos atribūtus jaunajā JSON-LD datu ietvarā
+
+def schemaVal(v, k=""):
+    if(v==None):
+        v = "Null"
+    if(representsType(k)=="lang"):
+        v_modif = {"@value": v, "@language": k}
+    elif(representsType(k)=="lang_ext"):
+        v_modif = {"@value": v, "language": k}     
+    else:
+        if(representsType(v) != "str"):
+            if(representsType(v) == "uri"):
+                v_modif = {"@id": v}
+            else:
+                schema_type = "http://www.w3.org/2001/XMLSchema#"
+                schema_type += representsType(v)
+                v_modif = {"@value": v, "@type": schema_type}
+        else: 
+            schema_type = "http://www.w3.org/2001/XMLSchema#"
+            schema_type += representsType(v)
+            v_modif = {"@value": v, "@type": schema_type}
+    return v_modif
+
+
+# jsonDataNoAttr(json_data) - funkcija, kas atrod JSON datos 
+# specifiskus atribūtus un pārveido tos par JSON-LD elementiem
+# (piemēram, atrod anime id, kas ir galvenais subjekts datiem 
+#  par konkrēto animi)
+def jsonDataNoAttr(json_data):
+    kitsu_json_data = json_data
+    kitsu_jsonld_data = {}
+    special_keys = ["links", "type", "id"]
+    key_arr = []
+    tmp_dict = {}
+    for key, val in kitsu_json_data.items():
+        if(key in special_keys):
+            if(key == "links"):
+                if(val_type(val)!="dict"):
+                    kitsu_jsonld_data.update({"@id":schemaVal(val)})
+                else:
+                    for key_1, val_1 in val.items():
+                        if(key_1 == "self"):
+                            tmp_dict.update(schemaVal(val_1))
+                        else:
+                            kitsu_jsonld_data.update({key_1:schemaVal(val_1)}) 
+            elif(key == "type"):
+                tmp_dict.update({"@type":val})
+            else:
+                if(key == "id"):
+                    tmp_dict.update({"uri:id_val":[schemaVal(val)]})
+                else:
+                    tmp_dict.update({"@"+key:schemaVal(val)})
+            key_arr.append(key)
+
+        if(len(key_arr)==len(special_keys)):
+            kitsu_jsonld_data.update(tmp_dict)
+            break 
+    for i in key_arr:
+        del kitsu_json_data[i]
+    return [kitsu_json_data,kitsu_jsonld_data]
+
+
+
+
+# # GALVENĀ kitsu API funkcija:
+# final_data(json_data, curr_id_pref = "") - funkcija, 
+# kas pārveido vienas vienības (konkrētas animes, 
+# mangas u.tml.) JSON datus par JSON-LD
+
+# // ir jāuzlabo funkcija, lai tā pārveidotu subj/pred/obj 
+# // datu formātu tuvāku DBPedia datu formātam
+
+def dbp_uri(key):
+    return "uri:" + key
+
+
+
+def final_data(json_data, curr_id_pref = ""): 
+#     rec_tmp_data
+
+    pointer = len(rec_tmp_data) - 1
+    for key, val in json_data.items():
+#         final_key = "uri:" + key
+        final_key = dbp_uri(key)
+        if(val_type(val)!="dict"):
+            rec_tmp_data[pointer].update({final_key:[schemaVal(val)]})       
+        else:
+            if((representsType(next(iter(val)))=="lang") 
+            or (representsType(next(iter(val)))=="lang_ext")):
+                tmp_lang_arr = []
+                for key_1, val_1 in val.items():
+                    tmp_lang_arr.append(schemaVal(val_1,key_1))
+                rec_tmp_data[pointer].update({final_key:tmp_lang_arr})
+            else:
+                rand_code = rand_node(6)+"_"
+                blank_node = "_:"+rand_code+key
+                rec_tmp_data[pointer].update({final_key:[schemaVal(blank_node)]})
+                
+                rec_tmp_data.append({"@id":blank_node})
+                pointer2 = len(rec_tmp_data) - 1
+                rec_tmp_data[pointer2].update(final_data(val, key+"_"))
+#                 rec_tmp_data[pointer2].update(final_data(val, key+"_"))
+    if(key != last_key):
+        return {}
+    
+    
+rec_tmp_data = []
+
+
+# # # Datu grafi no RDFlib moduļa, kas reprezentē pētāmos RDF datus
+
+# # Kitsu API:
+kitsu_jsonld_file_path = '''
+C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. semestris
+\\BAKALAURA DARBS\\Python\\Jupyter\\jsonld_data.jsonld.json"
+'''
+
+headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3"}
+# headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
+
+req_url = "https://kitsu.io/api/edge/anime/10057"
+req = Request(url=req_url, headers=headers) 
+json_api_content = urlopen(req).read().decode("UTF-8")
+# # ERROR 522 - nevar tikt pie API (problēma no kitsu puses)
+
+
+
+# kitsu_json_data - json fails parveidots vārdnīcas struktūrā 
+# un izņemts no ietvara "data"
+kitsu_json_data = json.loads(json_api_content)["data"]
+
+json_data_fst = jsonDataNoAttr(kitsu_json_data)[1]
+json_data_rest = jsonDataNoAttr(kitsu_json_data)[0]
+
+for key, val in kitsu_json_data.items():
+    last_key = key
+
+rec_tmp_data.append(json_data_fst) 
+final_data(json_data_rest)
+
+####### SVARĪGS IZVADS, NEDZĒST #########
+# print(json.dumps(rec_tmp_data))
+```
+
+```{python}
+# # # Datu grafi no RDFlib moduļa, kas reprezentē pētāmos RDF datus
+
+
+
+# # DBPedia:
+ttl_file_path = '''
+C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. semestris\\BAKALAURA DARBS\\
+Python\\Jupyter\\rdf_content.ttl'
+'''
+ttl_vocabulary_path = '''
+C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. 
+semestris\\BAKALAURA DARBS\\Python\\Jupyter\\vocabulary.ttl
+'''
+g_kitsu = rdflib.Graph()
+g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(rec_tmp_data),encoding='utf8'), format='json-ld')
+
+# # DBPedia API:
+g_DBp = rdflib.Graph()
+g_DBp.load("http://dbpedia.org/resource/Death_Note")
+for s, p, o in g_DBp:
+    print(p)
+    print(o)
+    print("")
+# g_DBp.load("http://dbpedia.org/resource/KonoSuba")
+```
+
+```{python}
+# # # Pārveido izvada vizuālo izskatu 
+
+
+# Palielina ekrāna izmēru kodam un izvadam līdz ekrāna izmēŗam - 100%
+from IPython.core.display import display, HTML
+display(HTML("<style>.container { width:100% !important; }</style>"))
+
+# balstoties uz subj/pred/obj simbolu garumiem, tiks noteikts 
+# maksimālais simbolu skaits visām tabulas kolonnas šūnām
+max_width = 10
+for subj, pred, obj in g_DBp: 
+    if(len(subj) > max_width):
+        max_width = len(subj)
+    elif(len(pred) > max_width):
+        max_width = len(pred)
+    elif(len(obj) > max_width):
+        max_width = len(obj) 
+        
+
+```
+
+```{python}
+
+```
+
+```{python}
+### informācijas savākšans no DBPedia linka
+
+d1 = graph_to_prefix_table__DataFrame(g_DBp)
+df1 = pd.DataFrame(data=d1)
+df1 = df1.style.set_properties(**{'text-align': 'left'})
+
+d2 = graph_to_prefix_table__DataFrame(g_kitsu_data)
+df2 = pd.DataFrame(data=d2)
+df2 = df2.style.set_properties(**{'text-align': 'left'})
+# d1
+# d2
+```
+
+```{python}
+####### SVARĪGS IZVADS, NEDZĒST #########
+# print(json.dumps(rec_tmp_data))
+```
+
+```{python}
+# # # Vizuālais interfeiss
+
+
+dbp_button = widgets.Button(description="DBPedia")
+display(dbp_button)
+kitsu_button = widgets.Button(description="Kitsu API")
+display(kitsu_button)
+
+out = widgets.Output()
+def on_button_clicked(b):
+    with out:
+        clear_output(True)
+        if(b.description == "DBPedia"):
+            clear_output(True)
+            display(df1)
+        else:
+            clear_output(True)
+            display(df2)
+
+dbp_button.on_click(on_button_clicked)
+kitsu_button.on_click(on_button_clicked)
+
+out
+
+```
+
+```{python}
+### Usefull code
+
+## Datu ierakstīšana failā
+# s = g.serialize(format='ttl')
+# f = open(ttl_file_path, 'wb')
+# f.write(s)
+# f.close()
+# json.dumps(rec_tmp_data)
+
+```
