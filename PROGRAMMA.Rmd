@@ -44,6 +44,8 @@ import datetime # var pārbaudīt, vai objekts ir datums
 qwerty = "qwerty"
 qwerty
 
+anaconda = "ac"
+
 ```
 
 ```{python}
@@ -214,7 +216,7 @@ def schemaVal(v, k=""):
             if(representsType(v) == "uri"):
                 v_modif = {"@id": v}
             else:
-                schema_type = "http://www.w3.org/2001/XMLSchema#"
+                schema_type = "https://www.w3.org/2001/XMLSchema#"
                 schema_type += representsType(v)
                 v_modif = {"@value": v, "@type": schema_type}
         else: 
@@ -222,6 +224,9 @@ def schemaVal(v, k=""):
             schema_type += representsType(v)
             v_modif = {"@value": v, "@type": schema_type}
     return v_modif
+
+def dbp_uri(key):
+    return "uri:kitsu/" + key
 
 
 # jsonDataNoAttr(json_data) - funkcija, kas atrod JSON datos 
@@ -246,10 +251,11 @@ def jsonDataNoAttr(json_data):
                         else:
                             kitsu_jsonld_data.update({key_1:schemaVal(val_1)}) 
             elif(key == "type"):
-                tmp_dict.update({"@type":val})
+                tmp_dict.update({"@type":"http://dbpedia.org/ontology/"+val.title()})
             else:
                 if(key == "id"):
-                    tmp_dict.update({"uri:id_val":[schemaVal(val)]})
+                    
+                    tmp_dict.update({"uri:kitsu/id_val":[schemaVal(val)]})
                 else:
                     tmp_dict.update({"@"+key:schemaVal(val)})
             key_arr.append(key)
@@ -272,8 +278,7 @@ def jsonDataNoAttr(json_data):
 # // ir jāuzlabo funkcija, lai tā pārveidotu subj/pred/obj 
 # // datu formātu tuvāku DBPedia datu formātam
 
-def dbp_uri(key):
-    return "uri:" + key
+
 
 
 
@@ -362,12 +367,14 @@ g_kitsu = rdflib.Graph()
 g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(rec_tmp_data),encoding='utf8'), format='json-ld')
 
 # # DBPedia API:
-g_DBp = rdflib.Graph()
-g_DBp.load("http://dbpedia.org/resource/Death_Note")
-for s, p, o in g_DBp:
-    print(p)
-    print(o)
-    print("")
+
+# g_DBp = rdflib.Graph()
+# g_DBp.load("http://dbpedia.org/resource/Death_Note")
+# for s, p, o in g_DBp:
+#     print(p)
+#     print(o)
+#     print("")
+
 # g_DBp.load("http://dbpedia.org/resource/KonoSuba")
 ```
 
@@ -390,10 +397,6 @@ for subj, pred, obj in g_DBp:
     elif(len(obj) > max_width):
         max_width = len(obj) 
         
-
-```
-
-```{python}
 
 ```
 
