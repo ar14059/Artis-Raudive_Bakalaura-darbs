@@ -201,7 +201,7 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
 # # # Kitsu API izveidotās funkcijas:
 
 def schema_val(v, k=""):
-    if(v==None):
+    if(v==None or v==[]):
         v = "Null"
     if(represents_type(k)=="lang"):
         v_modif = {"@value": v, "@language": k}
@@ -364,8 +364,8 @@ g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(rec_tmp_data),encoding='utf8'
 
 # # DBPedia API:
 
-# g_DBp = rdflib.Graph()
-# g_DBp.load("http://dbpedia.org/resource/Death_Note")
+g_DBp = rdflib.Graph()
+g_DBp.load("http://dbpedia.org/resource/Death_Note")
 # for s, p, o in g_DBp:
 #     print(p)
 #     print(o)
@@ -452,4 +452,13 @@ out
 # f.close()
 # json.dumps(rec_tmp_data)
 
+```
+
+```{python}
+# import wptools
+
+# page = wptools.page('Death_Note')
+# page.get_parse()
+# page.data['infobox'][0]
+# # page.data['infobox']
 ```
