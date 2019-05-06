@@ -82,7 +82,7 @@ sparql_lang_query = """
     } 
     LIMIT 1000
 """
-def sparqlResult(wrapper, query):    
+def sparql_result(wrapper, query):    
     arr = []
 
     sparql = SPARQLWrapper(wrapper)
@@ -94,19 +94,19 @@ def sparqlResult(wrapper, query):
         arr.append(result["l"]["value"])
     return arr
 
-# print(sparqlResult(sparql_lang_wrapper, sparql_lang_query))
+# print(sparql_result(sparql_lang_wrapper, sparql_lang_query))
 
 
 
-# representsType(s) - funkcija, kas pārbauda "Literal" vērtību, pārbauda, 
+# represents_type(s) - funkcija, kas pārbauda "Literal" vērtību, pārbauda, 
 # kāds varētu būt tā datutips un izvada tā nosaukumu, balstoties uz 
 # XMLSchema datutipiem (pagaidām tikai trīs tipi, 
 # kas tika atrasti JSON struktūrā)
 
 
 
-lang_arr = sparqlResult(sparql_lang_wrapper, sparql_lang_query)
-def representsType(s):
+lang_arr = sparql_result(sparql_lang_wrapper, sparql_lang_query)
+def represents_type(s):
     # OWL(varbūt) vārdnīcas
     
     uri_prefix_arr = ["http://","https://","uri:","_:"]
@@ -200,28 +200,24 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
 ```{python}
 # # # Kitsu API izveidotās funkcijas:
 
-# jsonDataNoAttr(json_data) - funkcija, kas izņem no JSON 
-# tipa datiem atribūtus, kas ir/būs saistīti ar DBPedia JSON-LD 
-# atribūtiem un ievieto šos atribūtus jaunajā JSON-LD datu ietvarā
-
-def schemaVal(v, k=""):
+def schema_val(v, k=""):
     if(v==None):
         v = "Null"
-    if(representsType(k)=="lang"):
+    if(represents_type(k)=="lang"):
         v_modif = {"@value": v, "@language": k}
-    elif(representsType(k)=="lang_ext"):
+    elif(represents_type(k)=="lang_ext"):
         v_modif = {"@value": v, "language": k}     
     else:
-        if(representsType(v) != "str"):
-            if(representsType(v) == "uri"):
+        if(represents_type(v) != "str"):
+            if(represents_type(v) == "uri"):
                 v_modif = {"@id": v}
             else:
                 schema_type = "https://www.w3.org/2001/XMLSchema#"
-                schema_type += representsType(v)
+                schema_type += represents_type(v)
                 v_modif = {"@value": v, "@type": schema_type}
         else: 
             schema_type = "http://www.w3.org/2001/XMLSchema#"
-            schema_type += representsType(v)
+            schema_type += represents_type(v)
             v_modif = {"@value": v, "@type": schema_type}
     return v_modif
 
@@ -229,11 +225,11 @@ def dbp_uri(key):
     return "uri:kitsu/" + key
 
 
-# jsonDataNoAttr(json_data) - funkcija, kas atrod JSON datos 
+# json_data_no_attr(json_data) - funkcija, kas atrod JSON datos 
 # specifiskus atribūtus un pārveido tos par JSON-LD elementiem
 # (piemēram, atrod anime id, kas ir galvenais subjekts datiem 
 #  par konkrēto animi)
-def jsonDataNoAttr(json_data):
+def json_data_no_attr(json_data):
     kitsu_json_data = json_data
     kitsu_jsonld_data = {}
     special_keys = ["links", "type", "id"]
@@ -243,21 +239,21 @@ def jsonDataNoAttr(json_data):
         if(key in special_keys):
             if(key == "links"):
                 if(val_type(val)!="dict"):
-                    kitsu_jsonld_data.update({"@id":schemaVal(val)})
+                    kitsu_jsonld_data.update({"@id":schema_val(val)})
                 else:
                     for key_1, val_1 in val.items():
                         if(key_1 == "self"):
-                            tmp_dict.update(schemaVal(val_1))
+                            tmp_dict.update(schema_val(val_1))
                         else:
-                            kitsu_jsonld_data.update({key_1:schemaVal(val_1)}) 
+                            kitsu_jsonld_data.update({key_1:schema_val(val_1)}) 
             elif(key == "type"):
                 tmp_dict.update({"@type":"http://dbpedia.org/ontology/"+val.title()})
             else:
                 if(key == "id"):
                     
-                    tmp_dict.update({"uri:kitsu/id_val":[schemaVal(val)]})
+                    tmp_dict.update({"uri:kitsu/id_val":[schema_val(val)]})
                 else:
-                    tmp_dict.update({"@"+key:schemaVal(val)})
+                    tmp_dict.update({"@"+key:schema_val(val)})
             key_arr.append(key)
 
         if(len(key_arr)==len(special_keys)):
@@ -290,18 +286,18 @@ def final_data(json_data, curr_id_pref = ""):
 #         final_key = "uri:" + key
         final_key = dbp_uri(key)
         if(val_type(val)!="dict"):
-            rec_tmp_data[pointer].update({final_key:[schemaVal(val)]})       
+            rec_tmp_data[pointer].update({final_key:[schema_val(val)]})       
         else:
-            if((representsType(next(iter(val)))=="lang") 
-            or (representsType(next(iter(val)))=="lang_ext")):
+            if((represents_type(next(iter(val)))=="lang") 
+            or (represents_type(next(iter(val)))=="lang_ext")):
                 tmp_lang_arr = []
                 for key_1, val_1 in val.items():
-                    tmp_lang_arr.append(schemaVal(val_1,key_1))
+                    tmp_lang_arr.append(schema_val(val_1,key_1))
                 rec_tmp_data[pointer].update({final_key:tmp_lang_arr})
             else:
                 rand_code = rand_node(6)+"_"
                 blank_node = "_:"+rand_code+key
-                rec_tmp_data[pointer].update({final_key:[schemaVal(blank_node)]})
+                rec_tmp_data[pointer].update({final_key:[schema_val(blank_node)]})
                 
                 rec_tmp_data.append({"@id":blank_node})
                 pointer2 = len(rec_tmp_data) - 1
@@ -336,8 +332,8 @@ json_api_content = urlopen(req).read().decode("UTF-8")
 # un izņemts no ietvara "data"
 kitsu_json_data = json.loads(json_api_content)["data"]
 
-json_data_fst = jsonDataNoAttr(kitsu_json_data)[1]
-json_data_rest = jsonDataNoAttr(kitsu_json_data)[0]
+json_data_fst = json_data_no_attr(kitsu_json_data)[1]
+json_data_rest = json_data_no_attr(kitsu_json_data)[0]
 
 for key, val in kitsu_json_data.items():
     last_key = key
@@ -416,7 +412,7 @@ df2 = df2.style.set_properties(**{'text-align': 'left'})
 
 ```{python}
 ####### SVARĪGS IZVADS, NEDZĒST #########
-# print(json.dumps(rec_tmp_data))
+print(json.dumps(rec_tmp_data))
 ```
 
 ```{python}
