@@ -39,13 +39,6 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 # # Papildus moduļi datu apstrādei / analīzei
 import datetime # var pārbaudīt, vai objekts ir datums
-
-
-qwerty = "qwerty"
-qwerty
-
-anaconda = "ac"
-
 ```
 
 ```{python}
@@ -63,8 +56,9 @@ def rand_node(count):
 
 def val_type(v):
     return type(v).__name__
+```
 
-
+```{python}
 # # # SPARQL izsaukumi
 
 sparql_lang_wrapper = "https://databus.dbpedia.org/repo/sparql"
@@ -89,15 +83,25 @@ def sparql_result(wrapper, query):
     sparql.setQuery(query)
     sparql.setReturnFormat(JSON)
     results = sparql.query().convert()
-    results
+#     results
     for result in results["results"]["bindings"]:
         arr.append(result["l"]["value"])
     return arr
 
-# print(sparql_result(sparql_lang_wrapper, sparql_lang_query))
+# def sparql_result(wrapper, query):    
+
+sparql = SPARQLWrapper(sparql_lang_wrapper)
+sparql.setQuery(sparql_lang_query)
+sparql.setReturnFormat(JSON)
+results = sparql.query().convert()
+# results
 
 
 
+print(sparql_result(sparql_lang_wrapper, sparql_lang_query))
+```
+
+```{python}
 # represents_type(s) - funkcija, kas pārbauda "Literal" vērtību, pārbauda, 
 # kāds varētu būt tā datutips un izvada tā nosaukumu, balstoties uz 
 # XMLSchema datutipiem (pagaidām tikai trīs tipi, 
@@ -176,13 +180,13 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
 
     # saīsina URI, izmantojot PREFIX vērtības
     for subj, pred, obj in rdf_graph:
-        for key,val in dict.items(): 
-            if (subj.startswith(val)):
-                subj = subj.replace(val, key + ":")           
-            if (pred.startswith(val)):
-                pred = pred.replace(val, key + ":")   
-            if (obj.startswith(val)):
-                obj = subj.replace(val, key + ":")  
+#         for key,val in dict.items(): 
+#             if (subj.startswith(val)):
+#                 subj = subj.replace(val, key + ":")           
+#             if (pred.startswith(val)):
+#                 pred = pred.replace(val, key + ":")   
+#             if (obj.startswith(val)):
+#                 obj = subj.replace(val, key + ":")  
 
         subject_array.append( subj )
         predicate_array.append( pred )
@@ -201,7 +205,8 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
 # # # Kitsu API izveidotās funkcijas:
 
 def schema_val(v, k=""):
-    if(v==None or v==[]):
+#     if(v==None or v==[]):
+    if(v==None):
         v = "Null"
     if(represents_type(k)=="lang"):
         v_modif = {"@value": v, "@language": k}
@@ -278,15 +283,24 @@ def json_data_no_attr(json_data):
 
 
 
-def final_data(json_data, curr_id_pref = ""): 
-#     rec_tmp_data
+def final_data(json_data, rec_tmp_data_start, last_key, curr_id_pref = ""): 
+    rec_tmp_data = rec_tmp_data_start
 
     pointer = len(rec_tmp_data) - 1
     for key, val in json_data.items():
 #         final_key = "uri:" + key
         final_key = dbp_uri(key)
         if(val_type(val)!="dict"):
-            rec_tmp_data[pointer].update({final_key:[schema_val(val)]})       
+            if(val_type(val)=="list"):
+                if(val==[]):
+                    rec_tmp_data[pointer].update({final_key:"Null"})
+                else:
+                    tmp_arr = []
+                    for arr_el in val:
+                        tmp_arr.append(schema_val(arr_el))
+                    rec_tmp_data[pointer].update({final_key:tmp_arr})
+            else:
+                rec_tmp_data[pointer].update({final_key:[schema_val(val)]})
         else:
             if((represents_type(next(iter(val)))=="lang") 
             or (represents_type(next(iter(val)))=="lang_ext")):
@@ -301,13 +315,13 @@ def final_data(json_data, curr_id_pref = ""):
                 
                 rec_tmp_data.append({"@id":blank_node})
                 pointer2 = len(rec_tmp_data) - 1
-                rec_tmp_data[pointer2].update(final_data(val, key+"_"))
+                rec_tmp_data[pointer2].update(final_data(val, rec_tmp_data, last_key, key+"_"))
 #                 rec_tmp_data[pointer2].update(final_data(val, key+"_"))
     if(key != last_key):
         return {}
     
     
-rec_tmp_data = []
+
 
 
 # # # Datu grafi no RDFlib moduļa, kas reprezentē pētāmos RDF datus
@@ -321,27 +335,46 @@ C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. semestris
 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3"}
 # headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
 
-req_url = "https://kitsu.io/api/edge/anime/10057"
-req = Request(url=req_url, headers=headers) 
-json_api_content = urlopen(req).read().decode("UTF-8")
-# # ERROR 522 - nevar tikt pie API (problēma no kitsu puses)
+# rec_tmp_data = []
 
+def get_one_kitsu_data(kitsu_id):
+    rec_tmp_data = []
+    
+    req_url = "https://kitsu.io/api/edge/anime/"+kitsu_id
+    req = Request(url=req_url, headers=headers) 
+    json_api_content = urlopen(req).read().decode("UTF-8")
+    # # ERROR 522 - nevar tikt pie API (problēma no kitsu puses)
 
+    # kitsu_json_data - json fails parveidots vārdnīcas struktūrā 
+    # un izņemts no ietvara "data"
+    kitsu_json_data = json.loads(json_api_content)["data"]
 
-# kitsu_json_data - json fails parveidots vārdnīcas struktūrā 
-# un izņemts no ietvara "data"
-kitsu_json_data = json.loads(json_api_content)["data"]
+    json_data_fst = json_data_no_attr(kitsu_json_data)[1]
+    json_data_rest = json_data_no_attr(kitsu_json_data)[0]
 
-json_data_fst = json_data_no_attr(kitsu_json_data)[1]
-json_data_rest = json_data_no_attr(kitsu_json_data)[0]
+    for key, val in kitsu_json_data.items():
+        last_key = key
 
-for key, val in kitsu_json_data.items():
-    last_key = key
-
-rec_tmp_data.append(json_data_fst) 
-final_data(json_data_rest)
+    rec_tmp_data.append(json_data_fst) 
+    final_data(json_data_rest, rec_tmp_data, last_key)
+    
+    return rec_tmp_data
+    
+def get_ALL_kitsu_data():
+    kitsu_BIG_DATA = []
+    for i in range(10056,10058):
+        k = get_one_kitsu_data(str(i))
+        kitsu_BIG_DATA.append(k)
+#         print(json.dumps(kitsu_BIG_DATA[0]))
+    return kitsu_BIG_DATA
+        
+k_data_all = get_ALL_kitsu_data()
+k_data = get_ALL_kitsu_data()[0]
+# print(json.dumps(k_data_all))
+# print(json.dumps(k_data))
 
 ####### SVARĪGS IZVADS, NEDZĒST #########
+# get_one_kitsu_data("10057")
 # print(json.dumps(rec_tmp_data))
 ```
 
@@ -360,13 +393,23 @@ C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8.
 semestris\\BAKALAURA DARBS\\Python\\Jupyter\\vocabulary.ttl
 '''
 g_kitsu = rdflib.Graph()
-g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(rec_tmp_data),encoding='utf8'), format='json-ld')
+# g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(rec_tmp_data),encoding='utf8'), format='json-ld')
+g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(k_data_all[0]),encoding='utf8'), format='json-ld')
+# g_kitsu_data_2 = g_kitsu.parse(data=bytes(json.dumps(k_data_all[1]),encoding='utf8'), format='json-ld')
 
 # # DBPedia API:
 
 g_DBp = rdflib.Graph()
 g_DBp.load("http://dbpedia.org/resource/Death_Note")
+
 # for s, p, o in g_DBp:
+#     print(s)
+#     print(p)
+#     print(o)
+#     print("")
+
+# for s, p, o in g_kitsu_data:
+#     print(s)
 #     print(p)
 #     print(o)
 #     print("")
@@ -392,8 +435,6 @@ for subj, pred, obj in g_DBp:
         max_width = len(pred)
     elif(len(obj) > max_width):
         max_width = len(obj) 
-        
-
 ```
 
 ```{python}
@@ -412,7 +453,16 @@ df2 = df2.style.set_properties(**{'text-align': 'left'})
 
 ```{python}
 ####### SVARĪGS IZVADS, NEDZĒST #########
-print(json.dumps(rec_tmp_data))
+# print(json.dumps(rec_tmp_data))
+```
+
+```{python}
+g_DBp_ex = rdflib.Graph()
+g_DBp_ex.load("http://dbpedia.org/resource/Template:Infobox_animanga/Header")
+d3 = graph_to_prefix_table__DataFrame(g_DBp_ex)
+df3 = pd.DataFrame(data=d3)
+df3 = df3.style.set_properties(**{'text-align': 'left'})
+# d3
 ```
 
 ```{python}
@@ -434,12 +484,12 @@ def on_button_clicked(b):
         else:
             clear_output(True)
             display(df2)
+#             display(df3)
 
 dbp_button.on_click(on_button_clicked)
 kitsu_button.on_click(on_button_clicked)
 
 out
-
 ```
 
 ```{python}
