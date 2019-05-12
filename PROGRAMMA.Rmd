@@ -226,8 +226,10 @@ def schema_val(v, k=""):
             v_modif = {"@value": v, "@type": schema_type}
     return v_modif
 
-def dbp_uri(key):
-    return "uri:kitsu/" + key
+def dbp_uri(key, rel_type = ""):
+    if(rel_type != ""):
+        rel_type += "/"
+    return "uri:kitsu/" + rel_type +  key
 
 
 # json_data_no_attr(json_data) - funkcija, kas atrod JSON datos 
@@ -271,6 +273,86 @@ def json_data_no_attr(json_data):
 
 
 
+```
+
+```{python}
+
+```
+
+```{python}
+headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3"}
+# headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
+
+
+
+def get_kitsu_data_by_uri(uri, headers):
+    try:
+        req_url = uri
+        req = Request(url=req_url, headers=headers) 
+        json_api_content = urlopen(req).read().decode("UTF-8")
+        # # ERROR 522 - nevar tikt pie API (problēma no kitsu puses)
+
+        # kitsu_json_data - json fails parveidots vārdnīcas struktūrā 
+        # un izņemts no ietvara "data"
+        kitsu_json_data = json.loads(json_api_content)["data"]
+        return kitsu_json_data
+    except:
+        return []
+
+
+
+# ex_data = get_kitsu_data_by_uri(ex_uri, headers)  
+# print(json.dumps(ex_data))
+
+def get_relationships_data(rel_uri, rel_type = ""):
+    data = get_kitsu_data_by_uri(rel_uri, headers)
+    dont_need = ["createdAt", "updatedAt"]
+    
+    tmp_list_arr = []
+    tmp_list_main = {}
+    tmp_list_main.update({"@id":rel_uri})
+    consists_of = dbp_uri("consistsOf")
+    tmp_list_main.update({consists_of:[]})
+    for data_el in data:
+        final_key = dbp_uri("has"+(rel_type).capitalize())
+        tmp_list_main[consists_of].append(schema_val(data_el["links"]["self"]))    
+        tmp_list = {}
+        for key, val in data_el.items():
+            
+            first_level = ["genres", "categories", "reviews", 
+                           "mediaRelationships", "episodes"]
+                
+            second_level = [("castings","person"), ("characters", "character"), 
+                            ("castings", "person"), ("staff", "person"), 
+                            ("staff", "person"), ("production", "company"),]
+#             questionable_level = ["quotes"]
+#                 quotes (API nederīgs)
+
+            if(key == "links"):
+                tmp_list.update({"@id":val["self"]})
+            elif(key == "attributes"):
+                if(val_type(val)=="list"):
+                    if((represents_type(next(iter(val)))=="lang") 
+                    or (represents_type(next(iter(val)))=="lang_ext")):
+                        tmp_lang_arr = []
+                        for key_1, val_1 in val.items():
+                            tmp_lang_arr.append(schema_val(val_1,key_1))
+                        tmp_list.update({final_key:tmp_lang_arr})
+                else:
+                    for attr_key, attr_val in val.items():
+                        if(attr_key not in dont_need):
+                            final_key = dbp_uri(attr_key, rel_type)
+                            tmp_list.update({final_key:[schema_val(attr_val)]})
+            else:
+                final_key = dbp_uri(key, rel_type)
+                tmp_list.update({final_key:[schema_val(val)]})
+            
+        tmp_list_arr.append(tmp_list)
+    tmp_list_arr.insert(0,tmp_list_main)
+    return tmp_list_arr
+#     return rec_tmp_data
+
+
 # # GALVENĀ kitsu API funkcija:
 # final_data(json_data, curr_id_pref = "") - funkcija, 
 # kas pārveido vienas vienības (konkrētas animes, 
@@ -278,8 +360,6 @@ def json_data_no_attr(json_data):
 
 # // ir jāuzlabo funkcija, lai tā pārveidotu subj/pred/obj 
 # // datu formātu tuvāku DBPedia datu formātam
-
-
 
 
 
@@ -309,19 +389,27 @@ def final_data(json_data, rec_tmp_data_start, last_key, curr_id_pref = ""):
                     tmp_lang_arr.append(schema_val(val_1,key_1))
                 rec_tmp_data[pointer].update({final_key:tmp_lang_arr})
             else:
-                rand_code = rand_node(6)+"_"
-                blank_node = "_:"+rand_code+key
-                rec_tmp_data[pointer].update({final_key:[schema_val(blank_node)]})
-                
-                rec_tmp_data.append({"@id":blank_node})
-                pointer2 = len(rec_tmp_data) - 1
-                rec_tmp_data[pointer2].update(final_data(val, rec_tmp_data, last_key, key+"_"))
-#                 rec_tmp_data[pointer2].update(final_data(val, key+"_"))
+                if(key == "relationships"):
+                    for rel_key, rel_val in val.items():
+                        final_key = dbp_uri(rel_key)
+                        rel_uri = rel_val["links"]["related"]
+                        rec_tmp_data[pointer].update({final_key:[schema_val(rel_uri)]})
+
+                        if(rel_key == "genres"):
+                            rel_arr = get_relationships_data(rel_uri, rel_key)
+                            for el in rel_arr:
+                                rec_tmp_data.append(el)
+                else:
+                    rand_code = rand_node(6)+"_"
+                    blank_node = "_:"+rand_code+key
+                    rec_tmp_data[pointer].update({final_key:[schema_val(blank_node)]})
+
+                    rec_tmp_data.append({"@id":blank_node})
+                    pointer2 = len(rec_tmp_data) - 1
+                    rec_tmp_data[pointer2].update(final_data(val, rec_tmp_data, last_key, key+"_"))
+    #                 rec_tmp_data[pointer2].update(final_data(val, key+"_"))
     if(key != last_key):
         return {}
-    
-    
-
 
 
 # # # Datu grafi no RDFlib moduļa, kas reprezentē pētāmos RDF datus
@@ -332,22 +420,14 @@ C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. semestris
 \\BAKALAURA DARBS\\Python\\Jupyter\\jsonld_data.jsonld.json"
 '''
 
-headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3"}
-# headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
 
 # rec_tmp_data = []
 
 def get_one_kitsu_data(kitsu_id):
     rec_tmp_data = []
     
-    req_url = "https://kitsu.io/api/edge/anime/"+kitsu_id
-    req = Request(url=req_url, headers=headers) 
-    json_api_content = urlopen(req).read().decode("UTF-8")
-    # # ERROR 522 - nevar tikt pie API (problēma no kitsu puses)
-
-    # kitsu_json_data - json fails parveidots vārdnīcas struktūrā 
-    # un izņemts no ietvara "data"
-    kitsu_json_data = json.loads(json_api_content)["data"]
+    uri = "https://kitsu.io/api/edge/anime/" + kitsu_id
+    kitsu_json_data = get_kitsu_data_by_uri(uri, headers)
 
     json_data_fst = json_data_no_attr(kitsu_json_data)[1]
     json_data_rest = json_data_no_attr(kitsu_json_data)[0]
@@ -362,20 +442,30 @@ def get_one_kitsu_data(kitsu_id):
     
 def get_ALL_kitsu_data():
     kitsu_BIG_DATA = []
-    for i in range(10056,10058):
+    for i in range(3,4):
         k = get_one_kitsu_data(str(i))
         kitsu_BIG_DATA.append(k)
 #         print(json.dumps(kitsu_BIG_DATA[0]))
     return kitsu_BIG_DATA
         
+
+    
+    
 k_data_all = get_ALL_kitsu_data()
 k_data = get_ALL_kitsu_data()[0]
 # print(json.dumps(k_data_all))
-# print(json.dumps(k_data))
+print(json.dumps(k_data))
+
 
 ####### SVARĪGS IZVADS, NEDZĒST #########
 # get_one_kitsu_data("10057")
-# print(json.dumps(rec_tmp_data))
+# print(json.dumps(rec_tmp_data)) 
+    
+    
+    
+ex_uri = "https://kitsu.io/api/edge/anime/3/genres"
+ex_rel_data = json.dumps(get_relationships_data(ex_uri))
+# print(ex_rel_data)
 ```
 
 ```{python}
