@@ -205,8 +205,8 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
 # # # Kitsu API izveidotās funkcijas:
 
 def schema_val(v, k=""):
-#     if(v==None or v==[]):
-    if(v==None):
+    if(v==None or v==[]):
+#     if(v==None):
         v = "Null"
     if(represents_type(k)=="lang"):
         v_modif = {"@value": v, "@language": k}
@@ -276,7 +276,47 @@ def json_data_no_attr(json_data):
 ```
 
 ```{python}
-
+k = "posterImage"
+# v = {"w":{"e":{"r":{"t":{"y":"https://kitsu.io/api/edge/media-characters/17763"}}}}, "asdfg":12}
+v = {
+    "tiny": "https://media.kitsu.io/anime/poster_images/3/tiny.jpg?1529208785",
+    "small": "https://media.kitsu.io/anime/poster_images/3/small.jpg?1529208785",
+    "medium": "https://media.kitsu.io/anime/poster_images/3/medium.jpg?1529208785",
+    "large": "https://media.kitsu.io/anime/poster_images/3/large.jpg?1529208785",
+    "original": "https://media.kitsu.io/anime/poster_images/3/original.jpg?1529208785",
+    "meta": {
+        "dimensions": {
+            "tiny": {
+                "width": 110,
+                "height": 156
+            },
+            "small": {
+                "width": 284,
+                "height": 402
+            },
+            "medium": {
+                "width": 390,
+                "height": 554
+            },
+            "large": {
+                "width": 550,
+                "height": 780
+            }
+        }
+    }
+}
+def get_chained_dict_data(val, key_uri):
+    tmp_dict = {}
+    for chn_key, chn_val in val.items():
+        chn_key_tmp = key_uri + "/" + chn_key
+        if(val_type(chn_val) != "dict"):
+            tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
+        else:
+            tmp_chain_dict = get_chained_dict_data(chn_val, chn_key_tmp)
+            tmp_dict.update(tmp_chain_dict)
+    return tmp_dict
+test_dict = get_chained_dict_data(v,k)
+print(json.dumps(test_dict))
 ```
 
 ```{python}
@@ -300,14 +340,32 @@ def get_kitsu_data_by_uri(uri, headers):
         return []
 
 
-
+    
 # ex_data = get_kitsu_data_by_uri(ex_uri, headers)  
 # print(json.dumps(ex_data))
 
-def get_relationships_data(rel_uri, rel_type = ""):
-    data = get_kitsu_data_by_uri(rel_uri, headers)
+
+
+
+
+
+
+second_level = {"castings":"person", "characters": "character", "castings": "person",
+                "staff": "person", "staff": "person", "production": "company"}
+def get_relationships_data(rel_uri, rel_type = "", snd_level = second_level):
+    tmp_data = get_kitsu_data_by_uri(rel_uri, headers)
+    if(val_type(tmp_data) == "dict"):
+        data = [tmp_data]
+    else:
+        data = tmp_data
     dont_need = ["createdAt", "updatedAt"]
     
+#     first_level = ["genres", "categories", "reviews", 
+#                    "mediaRelationships", "episodes", ]
+
+
+#     questionable_level = ["quotes"]
+#         quotes (API nederīgs)
     tmp_list_arr = []
     tmp_list_main = {}
     tmp_list_main.update({"@id":rel_uri})
@@ -318,16 +376,6 @@ def get_relationships_data(rel_uri, rel_type = ""):
         tmp_list_main[consists_of].append(schema_val(data_el["links"]["self"]))    
         tmp_list = {}
         for key, val in data_el.items():
-            
-            first_level = ["genres", "categories", "reviews", 
-                           "mediaRelationships", "episodes"]
-                
-            second_level = [("castings","person"), ("characters", "character"), 
-                            ("castings", "person"), ("staff", "person"), 
-                            ("staff", "person"), ("production", "company"),]
-#             questionable_level = ["quotes"]
-#                 quotes (API nederīgs)
-
             if(key == "links"):
                 tmp_list.update({"@id":val["self"]})
             elif(key == "attributes"):
@@ -343,14 +391,27 @@ def get_relationships_data(rel_uri, rel_type = ""):
                         if(attr_key not in dont_need):
                             final_key = dbp_uri(attr_key, rel_type)
                             tmp_list.update({final_key:[schema_val(attr_val)]})
+            elif(key == "relationships"): 
+                if(rel_type in snd_level and snd_level[rel_type] != ""): 
+                    
+                    snd_level_rel = snd_level[rel_type]
+                    snd_level_rel_val = val[snd_level_rel]["links"]["related"]
+                
+                    final_key = dbp_uri(snd_level_rel)
+                    tmp_list.update({final_key:[schema_val(snd_level_rel_val)]})
+
+                    tmp_list_arr_1st_level = get_relationships_data(snd_level_rel_val, snd_level_rel)
+                    
+                    for el_1st in tmp_list_arr_1st_level:
+                        tmp_list_arr.append(el_1st)
+                    
             else:
                 final_key = dbp_uri(key, rel_type)
                 tmp_list.update({final_key:[schema_val(val)]})
-            
         tmp_list_arr.append(tmp_list)
     tmp_list_arr.insert(0,tmp_list_main)
+    
     return tmp_list_arr
-#     return rec_tmp_data
 
 
 # # GALVENĀ kitsu API funkcija:
@@ -366,6 +427,9 @@ def get_relationships_data(rel_uri, rel_type = ""):
 def final_data(json_data, rec_tmp_data_start, last_key, curr_id_pref = ""): 
     rec_tmp_data = rec_tmp_data_start
 
+    rel_exceptions = [ "installments", "mappings", "quotes", "streamingLinks", 
+                       "animeProductions", "productions", "staff"]   
+    
     pointer = len(rec_tmp_data) - 1
     for key, val in json_data.items():
 #         final_key = "uri:" + key
@@ -391,11 +455,11 @@ def final_data(json_data, rec_tmp_data_start, last_key, curr_id_pref = ""):
             else:
                 if(key == "relationships"):
                     for rel_key, rel_val in val.items():
-                        final_key = dbp_uri(rel_key)
-                        rel_uri = rel_val["links"]["related"]
-                        rec_tmp_data[pointer].update({final_key:[schema_val(rel_uri)]})
+                        if(rel_key not in rel_exceptions):
+                            final_key = dbp_uri(rel_key)
+                            rel_uri = rel_val["links"]["related"]
+                            rec_tmp_data[pointer].update({final_key:[schema_val(rel_uri)]})
 
-                        if(rel_key == "genres"):
                             rel_arr = get_relationships_data(rel_uri, rel_key)
                             for el in rel_arr:
                                 rec_tmp_data.append(el)
@@ -407,7 +471,6 @@ def final_data(json_data, rec_tmp_data_start, last_key, curr_id_pref = ""):
                     rec_tmp_data.append({"@id":blank_node})
                     pointer2 = len(rec_tmp_data) - 1
                     rec_tmp_data[pointer2].update(final_data(val, rec_tmp_data, last_key, key+"_"))
-    #                 rec_tmp_data[pointer2].update(final_data(val, key+"_"))
     if(key != last_key):
         return {}
 
@@ -450,22 +513,26 @@ def get_ALL_kitsu_data():
         
 
     
-    
+
 k_data_all = get_ALL_kitsu_data()
 k_data = get_ALL_kitsu_data()[0]
+
 # print(json.dumps(k_data_all))
 print(json.dumps(k_data))
 
+# qw = get_relationships_data("https://kitsu.io/api/edge/anime/3/castings", "castings")
+# qw2 = get_relationships_data("https://kitsu.io/api/edge/castings/180/person", "person")
+
+# print(json.dumps(qw))
+# print(json.dumps(qw2))
 
 ####### SVARĪGS IZVADS, NEDZĒST #########
 # get_one_kitsu_data("10057")
 # print(json.dumps(rec_tmp_data)) 
-    
-    
-    
-ex_uri = "https://kitsu.io/api/edge/anime/3/genres"
-ex_rel_data = json.dumps(get_relationships_data(ex_uri))
-# print(ex_rel_data)
+```
+
+```{python}
+
 ```
 
 ```{python}
