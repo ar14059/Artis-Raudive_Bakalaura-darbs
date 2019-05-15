@@ -137,8 +137,12 @@ def represents_type(s):
                         raise ValueError()      
             except:
                 try:
-                    int(s)
-                    return "nonNegativeInteger"
+                    if(isinstance(s, int) and str(s) != "True" and str(s) != "False"):
+                        return "nonNegativeInteger"
+                    else:
+                        raise ValueError()
+#                     int(s)
+#                     return "nonNegativeInteger"
                 except:
                     try:
                         for pref in uri_prefix_arr:
@@ -160,7 +164,13 @@ def represents_type(s):
                                 else:
                                     raise ValueError()
                             except: 
-                                return "langString"
+                                try:
+                                    if(str(s) == "True" or str(s) == "False"):
+                                        return "boolean"
+                                    else:
+                                        raise ValueError()
+                                except: 
+                                    return "langString"
 
 
 
@@ -204,6 +214,11 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
     pd.options.display.max_colwidth = max_width  
     
     return {'Subject': subject_array, 'Predicate': predicate_array, 'Object': object_array}
+represents_type(True)
+```
+
+```{python}
+
 ```
 
 ```{python}
@@ -211,9 +226,9 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
 
 def schema_val(v, k=""):
     lang_type = ["lang", "lang_ext"]
-    if(v==None or v==[] or v=={}):
-#     if(v==None):
-        v = "Null"
+#     if(v==None or v==[] or v=={}):
+# #     if(v==None):
+#         v = "Null"
     
     
     if(represents_type(v) == "list"):
@@ -246,6 +261,10 @@ def dbp_uri(key, rel_type = ""):
     if(rel_type != ""):
         rel_type += "/"
     return "uri:kitsu/" + rel_type +  key
+```
+
+```{python}
+print(represents_type("False"))
 ```
 
 ```{python}
@@ -331,7 +350,6 @@ def get_kitsu_data_by_uri(req_url, headers):
                 data = [kitsu_json_data]
             else:
                 data = kitsu_json_data
-                
         return data
     except:
         return []
@@ -346,7 +364,7 @@ def url_with_filter_and_sort(uri, page_limit_val, page_offset_val):
     page_limit = "page[limit]=" + page_limit_v
     page_offset = "page[offset]=" + page_offset_v
     
-#     uri += sort + "&" + page_limit + "&" + page_offset
+#     uri += "?" +  sort + "&" + page_limit + "&" + page_offset
     uri += "?" + page_limit + "&" + page_offset
     return uri
 
@@ -415,14 +433,17 @@ def get_certain_article_data(uri, main_data_types, including_rel, rel_second_lev
                                     tmp_list.update({final_key:tmp_lang_arr})
                                 else: 
                                     tmp_chained_data = get_chained_dict_data(attr_val, attr_key)
+                                    tmp_chained_data = check_empty_val(tmp_chained_data)
                                     tmp_list.update(tmp_chained_data)
-                            else:
-                                final_key = dbp_uri(attr_key)
-                                tmp_list.update({final_key:schema_val(attr_val)})
+#                             else:
+#                                 final_key = dbp_uri(attr_key)
+#                                 tmp_list.update({final_key:schema_val(attr_val)})
                         else:
+                            
                             if(attr_key not in dont_need):
-                                final_key = dbp_uri(attr_key, tmp_rel_type)
-                                tmp_list.update({final_key:[schema_val(attr_val)]})   
+                                if(attr_val != "" and attr_val != None and attr_val != []):
+                                    final_key = dbp_uri(attr_key, tmp_rel_type)
+                                    tmp_list.update({final_key:[schema_val(attr_val)]})   
 
                 elif(key == "relationships"): 
                     if(tmp_rel_type not in main_data_types):
@@ -433,8 +454,9 @@ def get_certain_article_data(uri, main_data_types, including_rel, rel_second_lev
                                 final_key = dbp_uri(rel_key, key)
                                 tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
 
-                                tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
+                                tmp_list_arr_2nd_level = check_empty_val(get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level))
 
+                                
                                 for el_1st in tmp_list_arr_2nd_level:
                                     tmp_list_arr.insert(0,el_1st)
                     else:
@@ -495,7 +517,7 @@ def get_article_data(uri):
 # ex_uri = "https://kitsu.io/api/edge/anime/10/castings"
 # ex_uri = "https://kitsu.io/api/edge/anime/10/reviews"
 # ex_uri = "https://kitsu.io/api/edge/anime/10/animeProductions"
-ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
+# ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
 
 # ex_uri = "https://kitsu.io/api/edge/anime/10" 
 
@@ -510,8 +532,27 @@ ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
 
 ################################################
 
+ex_uri = "https://kitsu.io/api/edge/anime/3"
+
 kitsu_data_ex = get_article_data(ex_uri)
 print(json.dumps(kitsu_data_ex))
+```
+
+```{python}
+kkk = "qw"
+vvv = {"er":{"ty":"as"}}
+# dict_ex = {kkk:vvv}
+chained = get_chained_dict_data(vvv,kkk)
+
+def check_empty_val(data):
+    tmp_chained = {}
+    for key, val in chained.items():
+        if(val["@value"] != ""):
+            tmp_chained.update({key:val})
+    return tmp_chained
+
+# tmp_chained = check_empty_val(chained)
+# print(tmp_chained)
 ```
 
 ```{python}
