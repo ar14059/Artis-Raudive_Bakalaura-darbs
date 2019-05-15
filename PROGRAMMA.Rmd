@@ -215,6 +215,7 @@ def schema_val(v, k=""):
 #     if(v==None):
         v = "Null"
     
+    
     if(represents_type(v) == "list"):
         v_modif = {}
         for v_el in v:
@@ -312,226 +313,217 @@ for attr_key, attr_val in test_dict.items():
 ```
 
 ```{python}
-
-```
-
-```{python}
 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3"}
 # headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
 
-def get_kitsu_data_by_uri(uri, headers):
+
+def get_kitsu_data_by_uri(req_url, headers):
     try:
-        req_url = uri
         req = Request(url=req_url, headers=headers) 
         json_api_content = urlopen(req).read().decode("UTF-8")
-        # # ERROR 522 - nevar tikt pie API (problēma no kitsu puses)
-
-        # kitsu_json_data - json fails parveidots vārdnīcas struktūrā 
-        # un izņemts no ietvara "data"
+        
         kitsu_json_data = json.loads(json_api_content)["data"]
-        return kitsu_json_data
+        
+        if(kitsu_json_data == None):
+            data = []
+        else:
+            if(val_type(kitsu_json_data) == "dict"):
+                data = [kitsu_json_data]
+            else:
+                data = kitsu_json_data
+                
+        return data
     except:
         return []
 
 
+def url_with_filter_and_sort(uri, page_limit_val, page_offset_val):
+#     sort_v = sort_val
+    page_limit_v = page_limit_val
+    page_offset_v = page_offset_val
+    
+#     sort = "sort=" + sort_v
+    page_limit = "page[limit]=" + page_limit_v
+    page_offset = "page[offset]=" + page_offset_v
+    
+#     uri += sort + "&" + page_limit + "&" + page_offset
+    uri += "?" + page_limit + "&" + page_offset
+    return uri
+
+def get_max_data(uri):
+#     sort_v = "number" 
+    page_limit_v = 20
+    page_offset_v = 0
+    
+
+    data = []
+    uri = url_with_filter_and_sort(uri, str(page_limit_v), str(page_offset_v))
+    tmp_data = get_kitsu_data_by_uri(uri, headers)
+    if(len(tmp_data)==page_limit_v): 
+        while(tmp_data != []):
+            data += tmp_data
+            page_offset_v += page_limit_v
+#             uri = url_with_filter_and_sort(uri, str(page_limit_v), str(page_offset_v))
+            uri = url_with_filter_and_sort(uri, str(page_limit_v), str(page_offset_v))
+            tmp_data = get_kitsu_data_by_uri(uri, headers)
+    else:
+        data += get_kitsu_data_by_uri(uri, headers)
+    return data
+
+# get_max_data_ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
+# get_max_data_ex = get_max_data(get_max_data_ex_uri)
+# print(json.dumps(get_max_data_ex))
 
 def get_certain_article_data(uri, main_data_types, including_rel, rel_second_level):
-    tmp_data = get_kitsu_data_by_uri(uri, headers)
+    data = get_max_data(uri)
+    
     tmp_list_arr = []
-    uri
-    if(val_type(tmp_data) == "dict"):
-        data = [tmp_data]
-    else:
-        data = tmp_data
-    
-    if("type" in data[0]):
-        tmp_rel_type = data[0]["type"]
-    
+    if(data != []):
 
-    if(tmp_rel_type not in main_data_types):
-        tmp_list_main = {}
-        tmp_list_main.update({"@id":uri})
-        consists_of = dbp_uri("consistsOf")
-        tmp_list_main.update({consists_of:[]})
-    
-    for data_el in data:
-        
+        if("type" in data[0]):
+            tmp_rel_type = data[0]["type"]
+
+
         if(tmp_rel_type not in main_data_types):
-            tmp_list_main[consists_of].append(schema_val(data_el["links"]["self"]))    
-        
-        tmp_list = {}  
-        dont_need = ["createdAt", "updatedAt"]
+            tmp_list_main = {}
+            tmp_list_main.update({"@id":uri})
+            consists_of = dbp_uri("consistsOf")
+            tmp_list_main.update({consists_of:[]})
 
-        for key, val in data_el.items():
-            if(key == "links"):
-                tmp_list.update({"@id":val["self"]})
-            elif(key == "type"):
-                tmp_list.update({"@type":val}) 
-            elif(key == "attributes"): 
-                for attr_key, attr_val in val.items():
-                    if(val_type(attr_val)=="dict"):
-                        if(represents_type(next(iter(attr_val))) in lang_type):
-                            final_key = dbp_uri(attr_key)
-                            tmp_lang_arr = []
-                            for lang_key, lang_val in attr_val.items():
-                                tmp_lang_arr.append(schema_val(lang_val,lang_key))   
-                            tmp_list.update({final_key:tmp_lang_arr})
-                        else: 
-                            tmp_chained_data = get_chained_dict_data(attr_val, attr_key)
-                            tmp_list.update(tmp_chained_data)
+        for data_el in data:
+
+            if(tmp_rel_type not in main_data_types):
+                tmp_list_main[consists_of].insert(0,schema_val(data_el["links"]["self"]))    
+
+            tmp_list = {}  
+            dont_need = ["createdAt", "updatedAt"]
+
+            for key, val in data_el.items():
+                if(key == "links"):
+                    tmp_list.update({"@id":val["self"]})
+                elif(key == "type"):
+                    tmp_list.update({"@type":val}) 
+                elif(key == "attributes"): 
+                    for attr_key, attr_val in val.items():
+                        if(val_type(attr_val)=="dict"):
+                            if(attr_val != {}):
+                                if(represents_type(next(iter(attr_val))) in lang_type):
+                                    final_key = dbp_uri(attr_key)
+                                    tmp_lang_arr = []
+                                    for lang_key, lang_val in attr_val.items():
+                                        tmp_lang_arr.insert(0,schema_val(lang_val,lang_key))   
+                                    tmp_list.update({final_key:tmp_lang_arr})
+                                else: 
+                                    tmp_chained_data = get_chained_dict_data(attr_val, attr_key)
+                                    tmp_list.update(tmp_chained_data)
+                            else:
+                                final_key = dbp_uri(attr_key)
+                                tmp_list.update({final_key:schema_val(attr_val)})
+                        else:
+                            if(attr_key not in dont_need):
+                                final_key = dbp_uri(attr_key, tmp_rel_type)
+                                tmp_list.update({final_key:[schema_val(attr_val)]})   
+
+                elif(key == "relationships"): 
+                    if(tmp_rel_type not in main_data_types):
+                        for rel_key, rel_val in val.items():
+                            if(tmp_rel_type in rel_second_level and rel_key in rel_second_level[tmp_rel_type]):
+                                snd_level_rel_uri = rel_val["links"]["related"]
+
+                                final_key = dbp_uri(rel_key, key)
+                                tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
+
+                                tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
+
+                                for el_1st in tmp_list_arr_2nd_level:
+                                    tmp_list_arr.insert(0,el_1st)
                     else:
-                        if(attr_key not in dont_need):
-                            final_key = dbp_uri(attr_key, tmp_rel_type)
-                            tmp_list.update({final_key:[schema_val(attr_val)]})   
 
-            elif(key == "relationships"): 
-                if(tmp_rel_type not in main_data_types):
-                    for rel_key, rel_val in val.items():
-                        if(tmp_rel_type in rel_second_level and rel_key in rel_second_level[tmp_rel_type]):
-                            snd_level_rel_uri = rel_val["links"]["related"]
+                        for rel_key, rel_val in val.items():
+                            if(rel_key in including_rel):
+                                snd_level_rel_uri = rel_val["links"]["related"]
 
-                            final_key = dbp_uri(rel_key)
-                            tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
+                                final_key = dbp_uri(rel_key, key)
 
-                            tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
+                                tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
 
-                            for el_1st in tmp_list_arr_2nd_level:
-                                tmp_list_arr.append(el_1st)
-                else:
+                                tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
+                                for el_1st in tmp_list_arr_2nd_level:
+                                    tmp_list_arr.insert(0,el_1st)
+            tmp_list_arr.insert(0,tmp_list)
 
-                    for rel_key, rel_val in val.items():
-                        if(rel_key in including_rel):
-                            snd_level_rel_uri = rel_val["links"]["related"]
-
-                            final_key = dbp_uri(rel_key)
-
-                            tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
-                            
-                            tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
-                            for el_1st in tmp_list_arr_2nd_level:
-                                tmp_list_arr.append(el_1st)
-        tmp_list_arr.append(tmp_list)
-        
-    if(tmp_rel_type not in main_data_types):  
-        tmp_list_arr.append(tmp_list_main)
+        if(tmp_rel_type not in main_data_types):  
+            tmp_list_arr.insert(0,tmp_list_main)
     
     return tmp_list_arr
 
-# qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3")
-# qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/genres")
-# qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/categories")
-# qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/anime-characters")
-# qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/castings")
-
-# print(json.dumps(qw))
-
-
-
-
 
 def get_article_data(uri):
+    
     main_data_types = ["anime", "manga", "drama"]
+    
+    including_rel = ["genres", "categories", "castings", "reviews"]
+    rel_second_level = {"castings":"people/person", "reviews": "users"}
+    
     if("anime" in uri):
-        including_rel = ["genres", "categories", "castings", "reviews",
-                         "episodes", "animeProductions",
-                        "animeCharacters", "animeStaff"]
-        rel_second_level = {"castings":"people/person", "reviews": "users", "animeCharacters": "character",
-                        "animeStaff": "people", "animeProductions":"producer"}
+        
+        including_rel += ["episodes", "animeProductions", 
+                          "animeCharacters", "animeStaff"]
+        rel_second_level.update({"animeCharacters": "character",
+                                 "animeStaff": "people", 
+                                 "animeProductions":"producer"})
     
-    
-    
-#     elif("manga" in uri):
-#         including_rel = ["genres", "categories", "castings", "reviews",
-#                          "chapters", "mangaCharacters", "mangaStaff"]
-#         second_level = {"castings":"people/person", "reviews": "users", "mangaCharacters": "character",
-#                         "mangaStaff": "people", "animeProductions":"producer"}  
+    elif("manga" in uri):
+        
+        including_rel += ["chapters", "characters", "staff"]
+        rel_second_level.update({"characters": "mediaCharacters/character",
+                                 "staff": "people"})
 
-        
-        
-#     elif("drama" in uri):
-#         including_rel = ["genres", "categories", "castings", "reviews",
-#                          "episodes", "animeProductions",
-#                         "animeCharacters", "animeStaff"]
-#         second_level = {"castings":"people/person", "reviews": "users", "animeCharacters": "character",
-#                         "animeStaff": "people", "animeProductions":"producer"}  
+    else:
+        including_rel += ["chapters", "characters", "staff"]
+        rel_second_level.update({"characters": "mediaCharacters/character",
+                                 "staff": "people"})
+
         
     certaian_article_data = get_certain_article_data(uri, main_data_types, including_rel, rel_second_level)
     return certaian_article_data
 
-ex_uri = "https://kitsu.io/api/edge/anime/3"
+# Piemēri:
+######################## Anime
+
+# ex_uri = "https://kitsu.io/api/edge/anime/10/genres"
+# ex_uri = "https://kitsu.io/api/edge/anime/10/castings"
+# ex_uri = "https://kitsu.io/api/edge/anime/10/reviews"
+# ex_uri = "https://kitsu.io/api/edge/anime/10/animeProductions"
+ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
+
+# ex_uri = "https://kitsu.io/api/edge/anime/10" 
+
+######################## Manga
+
+# ex_uri = "https://kitsu.io/api/edge/manga/35/genres"
+# ex_uri = "https://kitsu.io/api/edge/manga/35/castings"
+# ex_uri = "https://kitsu.io/api/edge/manga/35/characters"
+# ex_uri = "https://kitsu.io/api/edge/manga/35/chapters"
+
+# ex_uri = "https://kitsu.io/api/edge/manga/35"
+
+################################################
+
 kitsu_data_ex = get_article_data(ex_uri)
 print(json.dumps(kitsu_data_ex))
 ```
 
 ```{python}
-
-```
-
-```{python}
-
-```
-
-```{python}
-
-
-```
-
-```{python}
-
-```
-
-```{python}
-
 # # # Datu grafi no RDFlib moduļa, kas reprezentē pētāmos RDF datus
-
-# # Kitsu API:
-kitsu_jsonld_file_path = '''
-C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. semestris
-\\BAKALAURA DARBS\\Python\\Jupyter\\jsonld_data.jsonld.json"
-'''
-
-
-```
-
-```{python}
-
-```
-
-```{python}
-# # # Datu grafi no RDFlib moduļa, kas reprezentē pētāmos RDF datus
-
-
-
 # # DBPedia:
-ttl_file_path = '''
-C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. semestris\\BAKALAURA DARBS\\
-Python\\Jupyter\\rdf_content.ttl'
-'''
-ttl_vocabulary_path = '''
-C:\\Users\\TTB_Detagari\\Google Drive\\LU\\4. kurss\\8. 
-semestris\\BAKALAURA DARBS\\Python\\Jupyter\\vocabulary.ttl
-'''
 g_kitsu = rdflib.Graph()
-# g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(rec_tmp_data),encoding='utf8'), format='json-ld')
 g_kitsu_data = g_kitsu.parse(data=bytes(json.dumps(kitsu_data_ex),encoding='utf8'), format='json-ld')
-# g_kitsu_data_2 = g_kitsu.parse(data=bytes(json.dumps(k_data_all[1]),encoding='utf8'), format='json-ld')
 
 # # DBPedia API:
 
 g_DBp = rdflib.Graph()
 g_DBp.load("http://dbpedia.org/resource/Death_Note")
-
-# for s, p, o in g_DBp:
-#     print(s)
-#     print(p)
-#     print(o)
-#     print("")
-
-# for s, p, o in g_kitsu_data:
-#     print(s)
-#     print(p)
-#     print(o)
-#     print("")
 
 # g_DBp.load("http://dbpedia.org/resource/KonoSuba")
 ```
@@ -609,18 +601,6 @@ dbp_button.on_click(on_button_clicked)
 kitsu_button.on_click(on_button_clicked)
 
 out
-```
-
-```{python}
-### Usefull code
-
-## Datu ierakstīšana failā
-# s = g.serialize(format='ttl')
-# f = open(ttl_file_path, 'wb')
-# f.write(s)
-# f.close()
-# json.dumps(rec_tmp_data)
-
 ```
 
 ```{python}
