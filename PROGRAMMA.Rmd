@@ -335,10 +335,10 @@ def get_kitsu_data_by_uri(uri, headers):
 
 
 
-def get_certain_article_data(rel_uri, snd_level_arr = second_level):
-    tmp_data = get_kitsu_data_by_uri(rel_uri, headers)
+def get_certain_article_data(uri, main_data_types, including_rel, rel_second_level):
+    tmp_data = get_kitsu_data_by_uri(uri, headers)
     tmp_list_arr = []
-    
+    uri
     if(val_type(tmp_data) == "dict"):
         data = [tmp_data]
     else:
@@ -350,7 +350,7 @@ def get_certain_article_data(rel_uri, snd_level_arr = second_level):
 
     if(tmp_rel_type not in main_data_types):
         tmp_list_main = {}
-        tmp_list_main.update({"@id":rel_uri})
+        tmp_list_main.update({"@id":uri})
         consists_of = dbp_uri("consistsOf")
         tmp_list_main.update({consists_of:[]})
     
@@ -387,13 +387,13 @@ def get_certain_article_data(rel_uri, snd_level_arr = second_level):
             elif(key == "relationships"): 
                 if(tmp_rel_type not in main_data_types):
                     for rel_key, rel_val in val.items():
-                        if(tmp_rel_type in snd_level_arr and rel_key in snd_level_arr[tmp_rel_type]):
+                        if(tmp_rel_type in rel_second_level and rel_key in rel_second_level[tmp_rel_type]):
                             snd_level_rel_uri = rel_val["links"]["related"]
 
                             final_key = dbp_uri(rel_key)
                             tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
 
-                            tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri)
+                            tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
 
                             for el_1st in tmp_list_arr_2nd_level:
                                 tmp_list_arr.append(el_1st)
@@ -407,7 +407,7 @@ def get_certain_article_data(rel_uri, snd_level_arr = second_level):
 
                             tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
                             
-                            tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri)
+                            tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
                             for el_1st in tmp_list_arr_2nd_level:
                                 tmp_list_arr.append(el_1st)
         tmp_list_arr.append(tmp_list)
@@ -417,7 +417,7 @@ def get_certain_article_data(rel_uri, snd_level_arr = second_level):
     
     return tmp_list_arr
 
-qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3")
+# qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3")
 # qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/genres")
 # qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/categories")
 # qw = get_certain_article_data("https://kitsu.io/api/edge/anime/3/anime-characters")
@@ -435,7 +435,7 @@ def get_article_data(uri):
         including_rel = ["genres", "categories", "castings", "reviews",
                          "episodes", "animeProductions",
                         "animeCharacters", "animeStaff"]
-        second_level = {"castings":"people/person", "reviews": "users", "animeCharacters": "character",
+        rel_second_level = {"castings":"people/person", "reviews": "users", "animeCharacters": "character",
                         "animeStaff": "people", "animeProductions":"producer"}
     
     
@@ -455,7 +455,7 @@ def get_article_data(uri):
 #         second_level = {"castings":"people/person", "reviews": "users", "animeCharacters": "character",
 #                         "animeStaff": "people", "animeProductions":"producer"}  
         
-    certaian_article_data = get_certain_article_data(uri)
+    certaian_article_data = get_certain_article_data(uri, main_data_types, including_rel, rel_second_level)
     return certaian_article_data
 
 ex_uri = "https://kitsu.io/api/edge/anime/3"
