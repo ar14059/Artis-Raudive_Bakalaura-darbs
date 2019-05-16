@@ -256,11 +256,11 @@ def schema_val(v, k=""):
                 v_modif = {"@value": v, "@type": schema_type}
     return v_modif
 
-
+uri_domain = "uri:kitsu/"
 def dbp_uri(key, rel_type = ""):
     if(rel_type != ""):
         rel_type += "/"
-    return "uri:kitsu/" + rel_type +  key
+    return uri_domain + rel_type +  key
 ```
 
 ```{python}
@@ -297,21 +297,7 @@ v = {
         }
     }
 }
-def get_chained_dict_data(val, key_uri):
-    tmp_dict = {}
-    for chn_key, chn_val in val.items():
-        chn_key_tmp = key_uri + "/" + chn_key
-        if(val_type(chn_val) != "dict"):
-            tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
-        else:
-            if(chn_val == {}):
-                tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
-            else:
-                tmp_chain_dict = get_chained_dict_data(chn_val, chn_key_tmp)
-                tmp_dict.update(tmp_chain_dict)
-    return tmp_dict
-# test_dict = get_chained_dict_data(v,k)
-# print(json.dumps(test_dict))
+
 ```
 
 ```{python}
@@ -387,96 +373,221 @@ def get_max_data(uri):
     else:
         data += get_kitsu_data_by_uri(uri, headers)
     return data
+```
 
-# get_max_data_ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
-# get_max_data_ex = get_max_data(get_max_data_ex_uri)
-# print(json.dumps(get_max_data_ex))
+```{python}
+k = "posterImage"
+v = {"tiny":"https://media.kitsu.io/anime/poster_images/10/tiny.jpg?1495114402",
+        "small": "https://media.kitsu.io/anime/poster_images/10/small.jpg?1495114402",
+        "medium": "https://media.kitsu.io/anime/poster_images/10/medium.jpg?1495114402",
+        "large": "https://media.kitsu.io/anime/poster_images/10/large.jpg?1495114402",
+        "original": "https://media.kitsu.io/anime/poster_images/10/original.jpg?1495114402",
+        "meta": {
+            "dimensions": {
+                "tiny": {
+                    "width": 123,
+                    "height": 456
+                },
+                "small": {
+                    "width": 222,
+                    "height": 444
+                },
+                "medium": {
+                    "width": None,
+                    "height": None
+                },
+                "large": {
+                    "width": None,
+                    "height": None
+                }
+            }
+        }
+    }
+# print(v)
 
+# def image_data_parser(val, key_uri):
+#     img_id = {}
+#     img_data = {}
+#     img_size = ["tiny", "small", "medium", "large"]
+#     for img_key, img_val in val.items():
+#         if(img_key in img_size):
+#             new_key = key_uri + "/" + img_key
+#             if(not_empty(img_val)):
+#                 img_id.update({new_key:[schema_val(img_val)]})
+#     return 
+
+def get_chained_dict_data(val, key_uri):
+    tmp_dict = {}
+    for chn_key, chn_val in val.items():
+        chn_key_tmp = key_uri + "/" + chn_key
+        if(val_type(chn_val) != "dict"):
+            if(not_empty(chn_val)):
+                tmp_dict.update({dbp_uri(chn_key_tmp) : [schema_val(chn_val)]})
+        else:
+            tmp_chain_dict = get_chained_dict_data(chn_val, chn_key_tmp)
+            tmp_dict.update(tmp_chain_dict)
+    return tmp_dict
+# test_dict = get_chained_dict_data(v,k)
+# print(json.dumps(test_dict))
+```
+
+```{python}
+
+```
+
+```{python}
+# def get_chained_dict_data(val, key_uri):
+#     tmp_dict = {}
+#     for chn_key, chn_val in val.items():
+#         chn_key_tmp = key_uri + "/" + chn_key
+#         if(val_type(chn_val) != "dict"):
+#             tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
+#         else:
+#             if(chn_val == {}):
+#                 tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
+#             else:
+#                 tmp_chain_dict = get_chained_dict_data(chn_val, chn_key_tmp)
+#                 tmp_dict.update(tmp_chain_dict)
+#     return tmp_dict
+# # test_dict = get_chained_dict_data(v,k)
+# # print(json.dumps(test_dict))
+
+
+
+
+
+
+
+
+
+
+
+domain_edge = ""
+
+def not_empty(val):
+    if(val != "" and val != None and val != [] and val_type(val) != "NoneType"
+    and val != {}):
+        return True
+    else:
+        return False
+
+
+def check_empty_val(data):
+    tmp_chained = {}
+    for key, val in data.items():
+        if("@value" in val):
+            if(not_empty(val["@value"])):
+                tmp_chained.update({key:val})
+    return tmp_chained
+
+ 
+def spec_val(key, val):
+    if("youtube" in key.lower() or "yt" in key.lower()):
+        return "https://www.youtube.com/watch?v=" + val
+    else:
+        return val
+# print(spec_val("youtubeVideoId","9aS-EgdAq6U"))
+ 
+    
+    
+    
 def get_certain_article_data(uri, main_data_types, including_rel, rel_second_level):
     data = get_max_data(uri)
     
+    dont_need = ["createdAt", "updatedAt"]
     tmp_list_arr = []
+    
     if(data != []):
 
         if("type" in data[0]):
             tmp_rel_type = data[0]["type"]
 
-
-        if(tmp_rel_type not in main_data_types):
-            tmp_list_main = {}
-            tmp_list_main.update({"@id":uri})
-            consists_of = dbp_uri("consistsOf")
-            tmp_list_main.update({consists_of:[]})
-
         for data_el in data:
 
-            if(tmp_rel_type not in main_data_types):
-                tmp_list_main[consists_of].insert(0,schema_val(data_el["links"]["self"]))    
-
             tmp_list = {}  
-            dont_need = ["createdAt", "updatedAt"]
 
             for key, val in data_el.items():
+                
                 if(key == "links"):
                     tmp_list.update({"@id":val["self"]})
                 elif(key == "type"):
-                    tmp_list.update({"@type":val}) 
+                    tmp_list.update({"@type":dbp_uri(val)}) 
                 elif(key == "attributes"): 
+                    
                     for attr_key, attr_val in val.items():
-                        if(val_type(attr_val)=="dict"):
-                            if(attr_val != {}):
-                                if(represents_type(next(iter(attr_val))) in lang_type):
-                                    final_key = dbp_uri(attr_key)
-                                    tmp_lang_arr = []
-                                    for lang_key, lang_val in attr_val.items():
-                                        tmp_lang_arr.insert(0,schema_val(lang_val,lang_key))   
-                                    tmp_list.update({final_key:tmp_lang_arr})
-                                else: 
-                                    tmp_chained_data = get_chained_dict_data(attr_val, attr_key)
-                                    tmp_chained_data = check_empty_val(tmp_chained_data)
-                                    tmp_list.update(tmp_chained_data)
-#                             else:
-#                                 final_key = dbp_uri(attr_key)
-#                                 tmp_list.update({final_key:schema_val(attr_val)})
+                        attr_val = spec_val(attr_key, attr_val)
+                        if(val_type(attr_val)=="dict" and attr_val != {}):
+                            if(represents_type(next(iter(attr_val))) in lang_type):
+                                final_key = dbp_uri(attr_key)
+                                tmp_lang_arr = []
+                                for lang_key, lang_val in attr_val.items():
+                                    if(not_empty(lang_key) and not_empty(lang_val)):
+                                        tmp_lang_arr.insert(0,schema_val(lang_val,lang_key)) 
+                                tmp_list.update({final_key:tmp_lang_arr})
+                            else: 
+                                tmp_chained_data = get_chained_dict_data(
+                                    attr_val, attr_key)
+
+                                tmp_chained_data = check_empty_val(tmp_chained_data)
+                                tmp_list.update(tmp_chained_data)
                         else:
-                            
                             if(attr_key not in dont_need):
-                                if(attr_val != "" and attr_val != None and attr_val != []):
+                                if(not_empty(attr_val)):
                                     final_key = dbp_uri(attr_key, tmp_rel_type)
                                     tmp_list.update({final_key:[schema_val(attr_val)]})   
 
                 elif(key == "relationships"): 
-                    if(tmp_rel_type not in main_data_types):
+                    if(tmp_rel_type in main_data_types):
                         for rel_key, rel_val in val.items():
-                            if(tmp_rel_type in rel_second_level and rel_key in rel_second_level[tmp_rel_type]):
-                                snd_level_rel_uri = rel_val["links"]["related"]
-
-                                final_key = dbp_uri(rel_key, key)
-                                tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
-
-                                tmp_list_arr_2nd_level = check_empty_val(get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level))
-
-                                
-                                for el_1st in tmp_list_arr_2nd_level:
-                                    tmp_list_arr.insert(0,el_1st)
-                    else:
-
-                        for rel_key, rel_val in val.items():
-                            if(rel_key in including_rel):
+                            if(rel_key in including_rel):    
                                 snd_level_rel_uri = rel_val["links"]["related"]
 
                                 final_key = dbp_uri(rel_key, key)
 
-                                tmp_list.update({final_key:[schema_val(snd_level_rel_uri)]})
-
-                                tmp_list_arr_2nd_level = get_certain_article_data(snd_level_rel_uri, main_data_types, including_rel, rel_second_level)
+                                tmp_list_arr_2nd_level = get_certain_article_data(
+                                    snd_level_rel_uri, main_data_types, 
+                                    including_rel, rel_second_level)
+                                tmp_rel_val_arr = []
                                 for el_1st in tmp_list_arr_2nd_level:
+                                    if("@type" in el_1st):
+                                        if(rel_key in el_1st["@type"]):
+                                            el_1st_id = schema_val(el_1st["@id"])
+                                            tmp_rel_val_arr.append(el_1st_id)
+                                    
+                                    tmp_list_arr.append(el_1st)
+                                tmp_list.update({final_key:tmp_rel_val_arr})
+
+
+                    elif(tmp_rel_type not in main_data_types 
+                    and tmp_rel_type in rel_second_level):
+
+                        split_arr = rel_second_level[tmp_rel_type].split("/")
+                        for rel_key, rel_val in val.items():
+
+                            if(tmp_rel_type in rel_second_level 
+                            and rel_key in rel_second_level[tmp_rel_type]):
+                                snd_level_rel_uri = rel_val["links"]["related"]
+
+                                final_key = dbp_uri(rel_key, key)
+                                                                
+                                tmp_list_arr_2nd_level = get_certain_article_data(
+                                    snd_level_rel_uri, main_data_types, 
+                                    including_rel, rel_second_level)
+                                tmp_rel_val_arr = []
+
+                                for el_1st in tmp_list_arr_2nd_level: 
+                                    if("@type" in el_1st):
+                                        for arr_el in split_arr:
+                                            if(arr_el in el_1st["@type"]):
+                                                el_1st_id = schema_val(el_1st["@id"])
+                                                tmp_rel_val_arr.append(el_1st_id)
+                                    
                                     tmp_list_arr.insert(0,el_1st)
+                                tmp_list.update({final_key:tmp_rel_val_arr})
+
+
+
             tmp_list_arr.insert(0,tmp_list)
-
-        if(tmp_rel_type not in main_data_types):  
-            tmp_list_arr.insert(0,tmp_list_main)
-    
     return tmp_list_arr
 
 
@@ -485,12 +596,15 @@ def get_article_data(uri):
     main_data_types = ["anime", "manga", "drama"]
     
     including_rel = ["genres", "categories", "castings", "reviews"]
-    rel_second_level = {"castings":"people/person", "reviews": "users"}
+    rel_second_level = {"castings":"people/person", "reviews": "user/users"}
     
     if("anime" in uri):
-        
+        including_rel = ["reviews"]
+#         including_rel = ["genres", "categories"]
+        rel_second_level = {"castings":"people/person", "reviews": "users"}
         including_rel += ["episodes", "animeProductions", 
                           "animeCharacters", "animeStaff"]
+
         rel_second_level.update({"animeCharacters": "character",
                                  "animeStaff": "people", 
                                  "animeProductions":"producer"})
@@ -501,25 +615,21 @@ def get_article_data(uri):
         rel_second_level.update({"characters": "mediaCharacters/character",
                                  "staff": "people"})
 
-    else:
-        including_rel += ["chapters", "characters", "staff"]
-        rel_second_level.update({"characters": "mediaCharacters/character",
-                                 "staff": "people"})
-
-        
-    certaian_article_data = get_certain_article_data(uri, main_data_types, including_rel, rel_second_level)
-    return certaian_article_data
+    return get_certain_article_data(uri, main_data_types, including_rel, rel_second_level)
 
 # Piemēri:
 ######################## Anime
 
 # ex_uri = "https://kitsu.io/api/edge/anime/10/genres"
 # ex_uri = "https://kitsu.io/api/edge/anime/10/castings"
+# ex_uri = "https://kitsu.io/api/edge/people/485"
 # ex_uri = "https://kitsu.io/api/edge/anime/10/reviews"
-# ex_uri = "https://kitsu.io/api/edge/anime/10/animeProductions"
+# ex_uri = "https://kitsu.io/api/edge/anime/10/anime-characters"
 # ex_uri = "https://kitsu.io/api/edge/anime/10/episodes"
+# ex_uri = "https://kitsu.io/api/edge/episodes/450"
 
-# ex_uri = "https://kitsu.io/api/edge/anime/10" 
+
+ex_uri = "https://kitsu.io/api/edge/anime/10" 
 
 ######################## Manga
 
@@ -532,27 +642,19 @@ def get_article_data(uri):
 
 ################################################
 
-ex_uri = "https://kitsu.io/api/edge/anime/3"
+# ex_uri = "https://kitsu.io/api/edge/anime/3"
 
 kitsu_data_ex = get_article_data(ex_uri)
 print(json.dumps(kitsu_data_ex))
+# 17022
 ```
 
 ```{python}
-kkk = "qw"
-vvv = {"er":{"ty":"as"}}
-# dict_ex = {kkk:vvv}
-chained = get_chained_dict_data(vvv,kkk)
 
-def check_empty_val(data):
-    tmp_chained = {}
-    for key, val in chained.items():
-        if(val["@value"] != ""):
-            tmp_chained.update({key:val})
-    return tmp_chained
+```
 
-# tmp_chained = check_empty_val(chained)
-# print(tmp_chained)
+```{python}
+
 ```
 
 ```{python}
