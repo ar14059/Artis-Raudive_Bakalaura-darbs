@@ -214,7 +214,9 @@ def graph_to_prefix_table__DataFrame(rdf_graph):
     pd.options.display.max_colwidth = max_width  
     
     return {'Subject': subject_array, 'Predicate': predicate_array, 'Object': object_array}
-represents_type(True)
+
+
+# represents_type(True)
 ```
 
 ```{python}
@@ -223,9 +225,9 @@ represents_type(True)
 
 ```{python}
 # # # Kitsu API izveidotās funkcijas:
-
+lang_type = ["lang", "lang_ext"]
 def schema_val(v, k=""):
-    lang_type = ["lang", "lang_ext"]
+    
 #     if(v==None or v==[] or v=={}):
 # #     if(v==None):
 #         v = "Null"
@@ -264,64 +266,15 @@ def dbp_uri(key, rel_type = ""):
 ```
 
 ```{python}
-print(represents_type("False"))
-```
-
-```{python}
-k = "posterImage"
-# v = {"w":{"e":{"r":{"t":{"y":"https://kitsu.io/api/edge/media-characters/17763"}}}}, "asdfg":12}
-v = {
-    "tiny": "https://media.kitsu.io/anime/poster_images/3/tiny.jpg?1529208785",
-    "small": "https://media.kitsu.io/anime/poster_images/3/small.jpg?1529208785",
-    "medium": "https://media.kitsu.io/anime/poster_images/3/medium.jpg?1529208785",
-    "large": "https://media.kitsu.io/anime/poster_images/3/large.jpg?1529208785",
-    "original": "https://media.kitsu.io/anime/poster_images/3/original.jpg?1529208785",
-    "meta": {
-        "dimensions": {
-            "tiny": {
-                "width": 110,
-                "height": 156
-            },
-            "small": {
-                "width": 284,
-                "height": 402
-            },
-            "medium": {
-                "width": 390,
-                "height": 554
-            },
-            "large": {
-                "width": 550,
-                "height": 780
-            }
-        }
-    }
-}
 
 ```
 
 ```{python}
-# next(iter(val)
-tmp_list = {}
-test_dict = {"createdAt": "2013-02-20T18:49:22.288Z","updatedAt": "2018-12-28T03:28:36.206Z","slug": "milly-thompson","names": {"en": "Milly Thompson","ja_jp": "ミリィ・トンプソン"}}
-
-lang_type = ["lang", "lang_ext"]
-for attr_key, attr_val in test_dict.items():
-    if(val_type(attr_val)=="dict"):
-        if(represents_type(next(iter(attr_val))) in lang_type):
-            tmp_lang_arr = []
-            for lang_key, lang_val in attr_val.items():
-                tmp_lang_arr.append(schema_val(lang_val,lang_key))
-            tmp_list.update({attr_key:tmp_lang_arr})
-# print(json.dumps(tmp_list))
-# print(val_type(test_dict))
-```
-
-```{python}
-headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3"}
-# headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
-
-
+headers = {"User-Agent": 
+           """
+           Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) 
+           Chrome/41.0.2228.0 Safari/537.3"}
+           """
 def get_kitsu_data_by_uri(req_url, headers):
     try:
         req = Request(url=req_url, headers=headers) 
@@ -339,6 +292,7 @@ def get_kitsu_data_by_uri(req_url, headers):
         return data
     except:
         return []
+
 
 
 def url_with_filter_and_sort(uri, page_limit_val, page_offset_val):
@@ -376,45 +330,37 @@ def get_max_data(uri):
 ```
 
 ```{python}
-k = "posterImage"
-v = {"tiny":"https://media.kitsu.io/anime/poster_images/10/tiny.jpg?1495114402",
-        "small": "https://media.kitsu.io/anime/poster_images/10/small.jpg?1495114402",
-        "medium": "https://media.kitsu.io/anime/poster_images/10/medium.jpg?1495114402",
-        "large": "https://media.kitsu.io/anime/poster_images/10/large.jpg?1495114402",
-        "original": "https://media.kitsu.io/anime/poster_images/10/original.jpg?1495114402",
-        "meta": {
-            "dimensions": {
-                "tiny": {
-                    "width": 123,
-                    "height": 456
-                },
-                "small": {
-                    "width": 222,
-                    "height": 444
-                },
-                "medium": {
-                    "width": None,
-                    "height": None
-                },
-                "large": {
-                    "width": None,
-                    "height": None
-                }
-            }
-        }
-    }
-# print(v)
 
-# def image_data_parser(val, key_uri):
-#     img_id = {}
-#     img_data = {}
-#     img_size = ["tiny", "small", "medium", "large"]
-#     for img_key, img_val in val.items():
-#         if(img_key in img_size):
-#             new_key = key_uri + "/" + img_key
-#             if(not_empty(img_val)):
-#                 img_id.update({new_key:[schema_val(img_val)]})
-#     return 
+```
+
+```{python}
+def not_empty(val):
+    if(val != "" and val != None and val != [] and val_type(val) != "NoneType" 
+    and val != {}):
+        return True
+    else:
+        return False
+
+domain_edge = ""
+
+
+
+ 
+def spec_val(key, val):
+    if("youtube" in key.lower() or "yt" in key.lower()):
+        return "https://www.youtube.com/watch?v=" + val
+    else:
+        return val
+
+def check_empty_val(data):
+    tmp_chained = {}
+    for key, val in data.items():
+        if("@value" in val):
+            if(not_empty(val["@value"])):
+                tmp_chained.update({key:val})
+    return tmp_chained
+
+
 
 def get_chained_dict_data(val, key_uri):
     tmp_dict = {}
@@ -428,7 +374,63 @@ def get_chained_dict_data(val, key_uri):
             tmp_dict.update(tmp_chain_dict)
     return tmp_dict
 # test_dict = get_chained_dict_data(v,k)
+# test_dict = get_chained_dict_data(v_meta,k_meta)
 # print(json.dumps(test_dict))
+    
+
+    
+
+def new_key_func(long_key, compare_with):
+    if(compare_with in long_key):
+        if(compare_with + "/" in long_key):
+             new_long_key = long_key.replace(compare_with + "/", "")
+        elif("/" + compare_with in long_key):
+             new_long_key = long_key.replace("/" + compare_with, "")
+        else:
+             new_long_key = long_key.replace(compare_with + "/", "") 
+    else:
+        new_long_key =  long_key
+    return new_long_key
+# print(new_key("uri:kitsu/meta/dimensions/tiny/height", "tiny"))
+    
+
+def get_image_data(val):
+    result = {}
+    tmp_id_storage = []
+    tmp_id_data_storage = []
+    img_size = ["tiny", "small", "medium", "large", "original"]
+    
+    if("meta" in val):
+        chained_data = get_chained_dict_data(val["meta"], "meta")
+        
+#         return chained_data
+    for img_key, img_val in val.items():
+        if(img_key in img_size):
+            
+            img_val_uri = img_val + "/" + img_key
+            id_dict = schema_val(img_val_uri)
+            tmp_id_storage.append(id_dict)
+            
+            id_data_dict = schema_val(img_val_uri)
+            id_data_dict.update({dbp_uri("img_path"):img_val})
+
+
+            tmp_chained_data = []
+            for chn_key, chn_val in chained_data.items():  
+                if(img_key in chn_key):
+                    new_key = new_key_func(chn_key, img_key)
+                    id_data_dict.update({new_key:chn_val})
+        tmp_id_data_storage.append(id_data_dict)
+#     return len(tmp_id_data_storage)
+    result = {"id_list":tmp_id_storage, "id_data_list":tmp_id_data_storage}
+#     result.append(tmp_id_storage)
+#     result.append(tmp_id_data_storage)
+    return result
+
+# print(json.dumps(get_image_data(v)["id_list"]))
+# print(json.dumps(get_image_data(v)["id_data_list"]))
+# print(get_image_data(v))
+
 ```
 
 ```{python}
@@ -436,61 +438,8 @@ def get_chained_dict_data(val, key_uri):
 ```
 
 ```{python}
-# def get_chained_dict_data(val, key_uri):
-#     tmp_dict = {}
-#     for chn_key, chn_val in val.items():
-#         chn_key_tmp = key_uri + "/" + chn_key
-#         if(val_type(chn_val) != "dict"):
-#             tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
-#         else:
-#             if(chn_val == {}):
-#                 tmp_dict.update({dbp_uri(chn_key_tmp) : schema_val(chn_val)})
-#             else:
-#                 tmp_chain_dict = get_chained_dict_data(chn_val, chn_key_tmp)
-#                 tmp_dict.update(tmp_chain_dict)
-#     return tmp_dict
-# # test_dict = get_chained_dict_data(v,k)
-# # print(json.dumps(test_dict))
 
 
-
-
-
-
-
-
-
-
-
-domain_edge = ""
-
-def not_empty(val):
-    if(val != "" and val != None and val != [] and val_type(val) != "NoneType"
-    and val != {}):
-        return True
-    else:
-        return False
-
-
-def check_empty_val(data):
-    tmp_chained = {}
-    for key, val in data.items():
-        if("@value" in val):
-            if(not_empty(val["@value"])):
-                tmp_chained.update({key:val})
-    return tmp_chained
-
- 
-def spec_val(key, val):
-    if("youtube" in key.lower() or "yt" in key.lower()):
-        return "https://www.youtube.com/watch?v=" + val
-    else:
-        return val
-# print(spec_val("youtubeVideoId","9aS-EgdAq6U"))
- 
-    
-    
-    
 def get_certain_article_data(uri, main_data_types, including_rel, rel_second_level):
     data = get_max_data(uri)
     
@@ -525,11 +474,17 @@ def get_certain_article_data(uri, main_data_types, including_rel, rel_second_lev
                                         tmp_lang_arr.insert(0,schema_val(lang_val,lang_key)) 
                                 tmp_list.update({final_key:tmp_lang_arr})
                             else: 
-                                tmp_chained_data = get_chained_dict_data(
-                                    attr_val, attr_key)
+                                if("image" in attr_key.lower()):
+                                    img_data = get_image_data(attr_val)
+                                    tmp_list.update({attr_key:img_data["id_list"]})
+                                    for img_el in img_data["id_data_list"]:
+                                        tmp_list_arr.append(img_el)
+                                else:
+                                    tmp_chained_data = get_chained_dict_data(
+                                        attr_val, attr_key)
 
-                                tmp_chained_data = check_empty_val(tmp_chained_data)
-                                tmp_list.update(tmp_chained_data)
+                                    tmp_chained_data = check_empty_val(tmp_chained_data)
+                                    tmp_list.update(tmp_chained_data)
                         else:
                             if(attr_key not in dont_need):
                                 if(not_empty(attr_val)):
@@ -599,9 +554,12 @@ def get_article_data(uri):
     rel_second_level = {"castings":"people/person", "reviews": "user/users"}
     
     if("anime" in uri):
-        including_rel = ["reviews"]
-#         including_rel = ["genres", "categories"]
-        rel_second_level = {"castings":"people/person", "reviews": "users"}
+
+# #         including_rel = ["genres", "categories"]
+#         including_rel = ["reviews"]
+#         rel_second_level = {"castings":"people/person", "reviews": "users"}
+
+
         including_rel += ["episodes", "animeProductions", 
                           "animeCharacters", "animeStaff"]
 
@@ -644,13 +602,9 @@ ex_uri = "https://kitsu.io/api/edge/anime/10"
 
 # ex_uri = "https://kitsu.io/api/edge/anime/3"
 
-kitsu_data_ex = get_article_data(ex_uri)
-print(json.dumps(kitsu_data_ex))
+# kitsu_data_ex = get_article_data(ex_uri)
+# print(json.dumps(kitsu_data_ex))
 # 17022
-```
-
-```{python}
-
 ```
 
 ```{python}
@@ -669,6 +623,10 @@ g_DBp = rdflib.Graph()
 g_DBp.load("http://dbpedia.org/resource/Death_Note")
 
 # g_DBp.load("http://dbpedia.org/resource/KonoSuba")
+```
+
+```{python}
+
 ```
 
 ```{python}
@@ -692,6 +650,10 @@ for subj, pred, obj in g_DBp:
 ```
 
 ```{python}
+
+```
+
+```{python}
 ### informācijas savākšans no DBPedia linka
 
 d1 = graph_to_prefix_table__DataFrame(g_DBp)
@@ -706,8 +668,16 @@ df2 = df2.style.set_properties(**{'text-align': 'left'})
 ```
 
 ```{python}
+
+```
+
+```{python}
 ####### SVARĪGS IZVADS, NEDZĒST #########
 # print(json.dumps(rec_tmp_data))
+```
+
+```{python}
+
 ```
 
 ```{python}
@@ -717,6 +687,10 @@ d3 = graph_to_prefix_table__DataFrame(g_DBp_ex)
 df3 = pd.DataFrame(data=d3)
 df3 = df3.style.set_properties(**{'text-align': 'left'})
 # d3
+```
+
+```{python}
+
 ```
 
 ```{python}
@@ -744,6 +718,10 @@ dbp_button.on_click(on_button_clicked)
 kitsu_button.on_click(on_button_clicked)
 
 out
+```
+
+```{python}
+
 ```
 
 ```{python}
